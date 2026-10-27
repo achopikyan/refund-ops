@@ -138,7 +138,12 @@ These are counts of recorded outcomes, not calibrated risk rates: 214 of the 248
 
 Historical model-call measurements are retained in the demo database as `demo_llm_calls`; a fresh workspace starts its own reported-cost counter at zero. A different provider or model needs its own extraction, while the existing recorded evidence remains inspectable.
 
-The [editable PowerPoint write-up](deliverables/write-up.pptx) is the primary presentation; a [searchable PDF viewing copy](deliverables/write-up.pdf) is also included. Two supporting documents go deeper: the [data analysis](deliverables/data-analysis.pdf) of the supplied CSVs, and [supplementary slides](deliverables/supplementary-slides.pdf) on the three policy versions and their shared evaluation path. Watch the [workflow demo](deliverables/demo.mp4) for both roles and the policy lifecycle. Backtest and comparison reports can be exported from the interface; the bundled demo database contains the recorded live extraction.
+The [editable PowerPoint write-up](deliverables/write-up.pptx) is the primary presentation; a [searchable PDF viewing copy](deliverables/write-up.pdf) is also included. Two supporting documents go deeper: the [data analysis](deliverables/data-analysis.pdf) of the supplied CSVs, and [supplementary slides](deliverables/supplementary-slides.pdf) on the three policy versions and their shared evaluation path. Backtest and comparison reports can be exported from the interface; the bundled demo database contains the recorded live extraction.
+
+Two recordings cover the same application, so pick by the time you have:
+
+- **[Quick demo](deliverables/demo.mp4):** 5 minutes, silent and captioned. Both roles and the policy lifecycle at a glance.
+- **[Narrated presentation](deliverables/narrated-presentation.mp4):** 21 minutes, in my own voice. I walk through the work and the reasoning behind it.
 
 ## Verify
 
