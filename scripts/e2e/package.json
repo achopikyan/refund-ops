@@ -1,0 +1,19 @@
+{
+  "name": "refund-ops-browser-checks",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install-browser": "playwright install chromium",
+    "workflows": "node runner.cjs ../record-demo.cjs --quick",
+    "record": "node runner.cjs ../record-demo.cjs --record",
+    "smoke": "node runner.cjs ../decision-evidence-e2e.cjs",
+    "shared-shadow": "node runner.cjs ../shared-shadow-e2e.cjs",
+    "policy-inline": "node runner.cjs ../policy-inline-e2e.cjs",
+    "policy-release": "node runner.cjs ../policy-release-e2e.cjs",
+    "reviewer-forms": "node runner.cjs ../reviewer-forms-e2e.cjs",
+    "provider-settings": "node runner.cjs ../provider-settings-e2e.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

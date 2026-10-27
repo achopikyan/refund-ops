@@ -1,0 +1,25 @@
+[project]
+name = "refund-ops"
+version = "0.1.0"
+authors = [{name = "achopikyan", email = "chopikian.arman@gmail.com"}]
+description = "Explainable refund operations with reviewed policy changes"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn==0.54.0",
+  "pydantic==2.13.5",
+  "httpx==0.28.1",
+  "openai==3.39.0",
+  "python-dotenv==1.2.3",
+  "python-multipart==0.0.32",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+
+[tool.uv]
+package = false

@@ -1,0 +1,8 @@
+* text=auto
+*.command text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.py text eol=lf
+# Byte-exact: the bundled demo database records the SHA-256 of these files.
+data/*.csv -text
+backend/refundops/llm.py -text

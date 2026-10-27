@@ -1,0 +1,212 @@
+/** Business walkthrough of the real local application.
+ * --quick: exercise the workflow without recording or long pauses.
+ * --record: record a 3-5 minute walkthrough to deliverables/demo.webm. The submitted demo.mp4 is its H.264 conversion:
+ *   ffmpeg -i deliverables/demo.webm -c:v libx264 -pix_fmt yuv420p -movflags +faststart deliverables/demo.mp4
+ * --source-db PATH: completed source evidence in a clean v1/v2/v3 workspace.
+ * The source database is never modified. Only an isolated SQLite copy is used.
+ */
+const {chromium}=require('playwright');
+const {spawn,spawnSync}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+const args=process.argv.slice(2),record=args.includes('--record'),quick=args.includes('--quick');
+if(record===quick)throw new Error('Choose exactly one: --quick or --record.');
+const value=key=>{const i=args.indexOf(key);return i<0?null:args[i+1]};
+const source=path.resolve(value('--source-db')||path.join(root,'data/demo/refundops.sqlite3'));
+const work=path.join(root,'var','demo-recording',String(Date.now()));fs.mkdirSync(work,{recursive:true});
+const db=path.join(work,'walkthrough.sqlite3');
+const py=path.join(root,process.platform==='win32'?'.venv/Scripts/python.exe':'.venv/bin/python');
+let browser,server,page,context,video;
+const events=[],errors=[];
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const poll=async(fn,label,seconds=45)=>{for(let i=0;i<seconds*5;i++){if(await fn())return;await wait(200)}throw new Error(label)};
+(async()=>{
+ assert(fs.existsSync(source),'Source database must already exist.');
+ const copied=spawnSync(py,['-c',"import sqlite3,sys; s=sqlite3.connect(sys.argv[1]); d=sqlite3.connect(sys.argv[2]); s.backup(d); d.close(); s.close()",source,db],{cwd:root,encoding:'utf8',windowsHide:true});assert.equal(copied.status,0,copied.stderr);
+ const port=await new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p))})});
+ const base=`http://127.0.0.1:${port}`;
+ const logfile=fs.openSync(path.join(work,'server.log'),'w');
+ server=spawn(py,['-m','uvicorn','refundops.main:app','--host','127.0.0.1','--port',String(port)],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'backend'),REFUNDOPS_DB:db,REFUNDOPS_AUTO_ANALYZE:'1',REFUNDOPS_SOURCE_POLICIES:'0',AI_PROVIDER:'openai',OPENAI_API_KEY:'',OPENROUTER_API_KEY:''},stdio:['ignore',logfile,logfile],windowsHide:true});
+ await poll(async()=>{try{return(await fetch(base+'/api/health')).ok}catch{return false}},'Application did not start');
+ const api=async(url,role='manager')=>{const r=await fetch(base+'/api'+url,{headers:{'X-Demo-Role':role}});assert(r.ok,await r.clone().text());return r.json()};
+ const connection=await api('/settings/llm');assert.equal(connection.provider,'openai');assert.equal(connection.analysis_mode,'saved_demo');assert.equal(connection.saved_analysis_provider,'openrouter');
+ const initialCalls=(await api('/metrics')).ai.calls;
+ let policies=await api('/policies');
+ assert.equal(policies.length,3,'Recording requires exactly the three source versions.');
+ assert.equal(policies.find(p=>p.status==='active').version,1);
+ assert(policies.filter(p=>p.status==='draft').length===2,'Recording must begin with v2 and v3 Draft.');
+ assert.equal((await api('/requests','reviewer')).length,20);
+ await poll(async()=> (await api('/requests','reviewer')).every(r=>r.analysis.status==='completed'),'All source evidence must be completed');
+ const history=await api('/history-analysis');assert.equal(history.complete_requests,248,'All historical evidence must be saved before recording');
+ browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined});
+ context=await browser.newContext({viewport:{width:1600,height:1000},...(record?{recordVideo:{dir:work,size:{width:1600,height:1000}}}:{})});
+ page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+ if(record)video=page.video();
+ await page.goto(base);const started=Date.now();
+ const subtitle=async(title,copy,seconds=6)=>{
+  console.log(title);events.push({at:Math.round((Date.now()-started)/1000),title,copy});
+  await page.evaluate(({title,copy})=>{
+   let box=document.getElementById('demo-caption');if(!box){box=document.createElement('aside');box.id='demo-caption';document.body.append(box)}
+   Object.assign(box.style,{position:'fixed',left:'265px',right:'30px',bottom:'16px',zIndex:'99999',padding:'17px 25px',borderRadius:'8px',background:'rgba(19,49,42,.97)',color:'white',boxShadow:'0 6px 26px #0002',pointerEvents:'none',fontFamily:'Arial,sans-serif'});
+   box.replaceChildren();let h=document.createElement('strong');h.textContent=title;Object.assign(h.style,{display:'block',fontSize:'23px',marginBottom:'5px'});let p=document.createElement('span');p.textContent=copy;Object.assign(p.style,{fontSize:'19px',lineHeight:'1.4'});box.append(h,p);
+  },{title,copy});
+  await wait(quick?60:seconds*1000);
+  if(quick&&['v2: historical results for this version','Compare all three versions on the same history','More automation is not the whole decision'].includes(title))await page.screenshot({path:path.join(work,'qa-'+title.replace(/[^a-z0-9]+/gi,'-')+'.png')});
+ };
+ const clear=async()=>page.evaluate(()=>document.getElementById('demo-caption')?.remove());
+ const top=async()=>page.evaluate(()=>scrollTo(0,0));
+ const role=async(name)=>{await clear();if(await page.locator('.profile').count())await page.locator('.profile').click();await page.getByRole('button',{name:new RegExp('^'+name)}).click();await top()};
+ const sidebar=async(name)=>{await clear();await page.locator('.sidebar').getByRole('button',{name,exact:true}).click();await top()};
+ const openPolicy=async(n)=>{await sidebar('Policies');const open=page.getByRole('button',{name:'Open Policy v'+n,exact:true});await open.waitFor({state:'visible'});assert.equal(await open.count(),1);await open.click();await page.getByRole('heading',{name:'Policy v'+n,exact:true}).waitFor();await top()};
+ const nav=()=>page.getByRole('navigation',{name:'Selected policy version',exact:true});
+ const tab=async(name)=>{await clear();await nav().getByRole('button',{name,exact:true}).click();await top()};
+ const focusReport=async(locator)=>locator.evaluate(element=>scrollTo({top:Math.max(0,element.getBoundingClientRect().top+scrollY-140),behavior:'instant'}));
+ const section=async(name)=>{await clear();await page.getByRole('navigation',{name:'Request sections'}).getByRole('link',{name,exact:true}).click()};
+ const request=async(id)=>{await clear();await page.getByRole('button',{name:'Review '+id,exact:true}).click();await section('Request')};
+
+ await subtitle('Refund Operations | achopikyan','One source dataset, two workspaces. Current v1 reproduces the old policy in a simulated ledger. v2 and v3 are tested before release.',7);
+ await role('Reviewer');
+ await poll(async()=>await page.locator('tbody tr').count()===20,'Reviewer did not show all20 requests');
+ await subtitle('Reviewer: all 20 supplied requests','All includes completed automatic refunds. Open, Fraud Review, Waiting and Completed are separate filters.',7);
+ await page.getByRole('button',{name:'Review view',exact:true}).click();
+ await request('RF-1071');
+ await subtitle('A workspace for fast, careful reviews','The queue stays on the left. Each request has separate sections, with distinct colors and a persistent action bar.');
+ await page.locator('#case-details').getByRole('button',{name:'Edit request',exact:true}).click();
+ await subtitle('Correct the request where you read it','Structured fields can be corrected with an explanation. Saving a changed input invalidates its old analysis and prepares new evidence.');
+ await page.locator('#case-details').getByRole('button',{name:'Cancel',exact:true}).click();
+ await section('Policy');
+ await subtitle('Trace every applicable rule','The Current version, route and reason appear together. All enabled rules are evaluated; priorities and policy-wide checks resolve the outcome.');
+ await section('Evidence');
+ await subtitle('LLM extraction is already prepared','The model reads request-time context and notes, extracts predefined facts, and cites source text. It does not approve refunds or see future outcomes.',8);
+ await section('Risk');
+ await subtitle('Risk supports judgment','Historical cohorts and monetary scenarios show recorded chargebacks, missing outcomes, review cost and possible exposure. Scenario assumptions remain explicit.',7);
+ await section('Customer');
+ await subtitle('Customer context stays separate','Earlier requests, prior refunds and inconsistent source data are visible. Activity records changes and decisions without cluttering the main review.');
+ await section('Activity');await page.locator('#case-activity summary').first().click();
+ await subtitle('An audit trail for every action','Approvals, partial refunds, rejection, requests for information, fraud escalation and holds are explained and recorded.');
+ await request('RF-2183');
+ await page.getByRole('heading',{name:'Resolve conflicting versions',exact:true}).scrollIntoViewIfNeeded();
+ await subtitle('Conflicting source rows cannot silently become a payment','RF-2183 contains two amounts. A reviewer must verify the canonical version; the system keeps both originals and blocks an unresolved approval.',7);
+
+ await role('Refund Operations Manager');
+ await subtitle('Manager: one library of policy versions','v1 remains Current. v2 and v3 start as editable drafts; each has its own Settings, Rules, Discovery, Backtest and Shadow pages.',7);
+ await page.getByRole('button',{name:'Create policy',exact:true}).click();
+ await subtitle('Create a version from an existing policy or from scratch','Creation is explicit. Editing an existing draft autosaves that same version; it does not create another policy.');
+ await page.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();
+ await openPolicy(2);
+ await page.getByText('Execution limits',{exact:false}).first().scrollIntoViewIfNeeded();
+ await subtitle('Visible checks and editable limits','Data safety, business checks, standard evidence questions and payment budgets are explicit. No hidden fallback rule decides a refund.',7);
+ await tab('Rules');
+ const amountRule=page.getByRole('article',{name:'Rule Review amounts above $300',exact:true});
+ await amountRule.getByLabel('Condition value',{exact:true}).fill('250');
+ await amountRule.getByLabel('Rule name',{exact:true}).fill('Review amounts above $250');
+ await poll(async()=> (await api('/policies')).find(p=>p.version===2).data.rules.find(r=>r.id==='amount-limit').conditions[0].value===25000,'Inline rule change did not save');
+ await subtitle('Edit rules in place, with autosave','Change a condition directly and see it save. We restore the original $300 threshold before Backtest so comparisons use the supplied versions.',7);
+ const changedRule=page.getByRole('article',{name:'Rule Review amounts above $250',exact:true});
+ await changedRule.getByLabel('Condition value',{exact:true}).fill('300');
+ await changedRule.getByLabel('Rule name',{exact:true}).fill('Review amounts above $300');
+ await poll(async()=>{const rule=(await api('/policies')).find(p=>p.version===2).data.rules.find(r=>r.id==='amount-limit');return rule.conditions[0].value===30000&&rule.name==='Review amounts above $300'},'Original rule did not save before Backtest');
+ if(record)await wait(1200);
+ await page.getByRole('button',{name:'Add rule',exact:true}).click();
+ await page.getByRole('button',{name:/^Describe with AI/}).click();
+ await subtitle('Two ways to add a rule','Build manually, or describe an intent and review the LLM proposal before adding it. Natural-language drafting needs a live connection; this recording uses saved evidence.',7);
+ await page.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();
+ await tab('Discovery');await page.getByRole('button',{name:'Generate candidates',exact:true}).click();
+ await page.locator('.composer-candidate').first().waitFor();
+ const firstCandidate=page.locator('.composer-candidate').first();await firstCandidate.scrollIntoViewIfNeeded();
+ await firstCandidate.getByRole('checkbox').check();
+ await subtitle('Discover new hypotheses from historical cases','Candidates not already covered by this version show support, manual-review opportunity, unknown outcomes and financial scenarios. Selection has a clear destination.',7);
+ await firstCandidate.locator('summary').click();
+ await subtitle('Inspect evidence before adding a candidate','Training support and a later diagnostic split are shown separately. Historical approvals are observations, not ground-truth safety labels.');
+ await firstCandidate.getByRole('checkbox').uncheck();
+ await tab('Backtest');
+ await subtitle('Backtest: inspect the plan before running','Every historical request is replayed through this exact version using its saved extraction. Outcomes remain diagnostic context and replay makes no payments.',7);
+ await page.getByRole('button',{name:'Run backtest',exact:true}).click();
+ let evidence=page.getByRole('region',{name:'Decision evidence',exact:true});
+ await evidence.getByRole('heading',{name:'Policy results',exact:true}).waitFor({timeout:60000});
+ await focusReport(evidence);
+ await subtitle('v2: historical results for this version','The page reports v2 alone. The manager sees routing, evidence completeness and uncertainty before deciding whether to begin Shadow.');
+ for(const name of ['Safety & evidence','Workload & money','Segments & rules','Cases']){
+  await clear();await evidence.getByRole('button',{name,exact:true}).click();await focusReport(evidence);
+  await subtitle(name,{'Safety & evidence':'Known adverse outcomes, missing evidence and unobserved outcomes remain distinct. Zero recorded errors does not prove zero risk.','Workload & money':'Proposed refund exposure, historical review minutes and assumption-based costs reveal tradeoffs. Proposed money is not money actually paid.','Segments & rules':'Inspect where results change by cohort and which rules match, win, or are overridden. Aggregate automation can hide a risky segment.','Cases':'Only Cases expands individual requests. Inspect disagreements and supporting evidence before treating a metric as a release argument.'}[name],5);
+ }
+ await tab('Shadow');
+ await subtitle('Shadow starts only when the manager chooses','Backtest does not silently activate Shadow. The version is frozen before observing the shared request pool.');
+ await page.getByRole('button',{name:'Start Shadow',exact:true}).click();
+ await page.getByRole('heading',{name:'Shared requests, one review',exact:true}).waitFor();
+ await page.getByRole('button',{name:/^Existing requests/}).click();
+ await focusReport(evidence);
+ await subtitle('v2 is now in Shadow','It evaluates the same existing requests as Current, without creating payments or showing its proposals to reviewers. Existing backlog cannot qualify a release.',7);
+ await openPolicy(3);await tab('Rules');
+ await page.getByRole('article',{name:'Rule Apparel returns up to $300, including repeat requests',exact:true}).scrollIntoViewIfNeeded();
+ await subtitle('v3: a deliberately broader alternative','v3 allows larger apparel returns, including repeat requests. It is a hypothesis to investigate, not an improvement just because it automates more.',7);
+ await tab('Backtest');await page.getByRole('button',{name:'Run backtest',exact:true}).click();
+ await page.getByRole('region',{name:'Decision evidence',exact:true}).getByRole('heading',{name:'Policy results',exact:true}).waitFor({timeout:60000});
+ await focusReport(page.getByRole('region',{name:'Decision evidence',exact:true}));
+ await subtitle('v3 follows the same historical checks','The same data, saved evidence and evaluation engine make version differences inspectable. No special evaluation mode favors a candidate.');
+ await tab('Shadow');await page.getByRole('button',{name:'Start Shadow',exact:true}).click();
+ await page.getByRole('heading',{name:'Shared requests, one review',exact:true}).waitFor();
+ await subtitle('Both candidates now observe the shared pool','v1 is still Current. v2 and v3 are in Shadow, with locked rules and separate results.');
+
+ await role('Reviewer');await page.getByRole('button',{name:'Review view',exact:true}).click();await request('RF-1071');
+ await page.getByRole('button',{name:'Partial refund',exact:true}).click();
+ await page.getByLabel('Refund amount in USD',{exact:true}).fill('15');
+ await page.getByRole('dialog').getByLabel('Reason',{exact:true}).fill('Walkthrough decision: cosmetic chip documented in the customer note and clear photos confirmed by support. Record a $15 partial refund.');
+ await subtitle('One independent reviewer decision','The reviewer sees Current and source evidence only. This partial-refund decision will become a shared comparison reference for both Shadow versions.',7);
+ await clear();await page.getByRole('button',{name:'Confirm partial refund',exact:true}).click();
+ await poll(async()=>!!(await api('/requests','reviewer')).find(r=>r.external_id==='RF-1071').decision,'Partial refund was not recorded');
+ await subtitle('A recorded decision and one simulated payment','The decision is versioned, explained and written atomically with its ledger entry. Repeating the action cannot create a second refund.');
+ await request('RF-1076');await page.getByRole('button',{name:'Request information',exact:true}).click();
+ await page.getByRole('dialog').getByLabel('Reason',{exact:true}).fill('A damage claim above $50 needs a confirmed photo. Please provide the missing photograph before review resumes.');
+ await clear();await page.getByRole('button',{name:'Confirm request',exact:true}).click();
+ await subtitle('Missing evidence has a real work state','The request waits for information. It cannot proceed until new evidence is recorded and verified; fraud escalation and holds use the same explicit workflow.');
+
+ await role('Refund Operations Manager');await sidebar('Compare versions');
+ for(const n of [2,3])await page.locator('.comparison-picker label').filter({hasText:'Policy v'+n}).click();
+ const comparison=page.getByRole('region',{name:'Version comparison',exact:true});
+ await comparison.getByRole('heading',{name:'Compare 3 versions',exact:true}).waitFor();
+ await focusReport(comparison);
+ await subtitle('Compare all three versions on the same history','Current v1, v2 and v3 appear side by side. Each indicator keeps its denominator and definition; the manager owns the acceptable tradeoff.',7);
+ await comparison.getByRole('button',{name:'Workload & money',exact:true}).click();
+ await focusReport(comparison);
+ await subtitle('More automation is not the whole decision','Compare review workload alongside refund exposure, known adverse outcomes and missing outcome coverage. Cost assumptions are editable in global Settings.',7);
+ await clear();await page.locator('.comparison-modes').getByRole('button',{name:/Shadow/}).click();
+ await page.getByRole('button',{name:'Existing requests',exact:true}).click();
+ await comparison.getByRole('button',{name:'Cases',exact:true}).click();
+ await focusReport(comparison);
+ await subtitle('Shadow comparison reuses the reviewer work','The same request pool and the recorded partial decision feed both candidates. Agreement, changed decisions and potential overpayment remain visible per version.',7);
+ await openPolicy(2);await tab('Shadow');
+ await page.getByRole('button',{name:'Review release readiness',exact:true}).click();
+ await page.getByRole('heading',{name:'Release readiness',exact:true}).waitFor();
+ assert(await page.getByRole('button',{name:'Activate with limits',exact:true}).isDisabled());
+ await focusReport(page.getByRole('heading',{name:'Release readiness',exact:true}));
+ await subtitle('A demonstration is not prospective release evidence','The source backlog cannot prove a safe rollout. Activation stays unavailable until the configured new-arrival evidence and financial requirements are met.',8);
+ await openPolicy(1);await tab('Performance');
+ await focusReport(page.getByRole('region',{name:'Policy performance'}));
+ await subtitle('Current performance belongs to the serving version','Open workload, recorded decisions, actual simulated payments, outcomes and execution limits are separated. v1 stayed Current throughout this walkthrough.',7);
+ await page.getByRole('region',{name:'Policy performance'}).getByRole('button',{name:'Execution & limits',exact:true}).click();
+ await focusReport(page.getByRole('region',{name:'Policy performance'}));
+ await subtitle('Current runs automatically within visible limits','Each eligible payment checks data, evidence, amount and cumulative spending atomically. A blocked case stays available for human review.');
+ await sidebar('Data');
+ await subtitle('Run the supplied file or import another CSV','The same application supports pending.csv and a new file with the same columns. Imports preserve source rows, normalize values and surface duplicates.');
+ await sidebar('Settings');
+ await page.getByRole('heading',{name:'AI connection',exact:true}).waitFor();
+ assert.equal(await page.getByText(/Automatic routing checks|Preparing automatic routing|Model qualification/).count(),0);
+ await page.getByText('p95 latency',{exact:true}).waitFor();
+ await page.getByText('Using saved live analysis',{exact:true}).waitFor();
+ await subtitle('One local app, two operating systems','Windows: START.cmd. macOS: sh START.command. The launcher installs dependencies and opens the browser. API keys stay on the backend.',7);
+ await sidebar('Policies');
+ await subtitle('Ready for an evidence-based decision | achopikyan','v1 Current. v2 and v3 in Shadow. Real saved extraction, explainable rules and explicit uncertainty; no fabricated prospective outcomes or real payments.',8);
+ if(record){const remaining=245000-(Date.now()-started);if(remaining>0)await wait(remaining)}
+ policies=await api('/policies');assert.equal(policies.find(p=>p.status==='active').version,1);
+ const library=await api('/policy-versions');for(const n of [2,3])assert.equal(library.versions.find(v=>v.version===n).stage,'shadow');
+ assert.equal((await api('/requests','reviewer')).length,20);assert.equal(errors.length,0,errors.join('\n'));
+ assert.equal((await api('/metrics')).ai.calls,initialCalls,'Saved walkthrough must not make new provider calls.');
+ const comparisonData=await api('/policy-comparisons/shadow?policy_ids='+policies.filter(p=>p.version!==1).map(p=>p.id).join(','));
+ for(const v of comparisonData.versions){assert(v.available);assert.equal(v.decision_reports.backlog.quality.total,20);assert(v.decision_reports.backlog.quality.reference_count>=1,'Both Shadows must reuse the reviewer decision');}
+ const report={recorded:record,source:path.basename(source),duration_seconds:Math.round((Date.now()-started)/1000),versions:library.versions.map(v=>({version:v.version,stage:v.stage})),requests:20,events,errors};
+ fs.writeFileSync(path.join(work,'walkthrough.json'),JSON.stringify(report,null,2));
+ await page.screenshot({path:path.join(work,'final-frame.png')});
+ await context.close();if(record){await video.saveAs(path.join(root,'deliverables/demo.webm'));fs.writeFileSync(path.join(root,'deliverables/demo-chapters.json'),JSON.stringify(report,null,2))}
+ console.log(JSON.stringify({status:'passed',recorded:record,duration:report.duration_seconds,work}));
+})().catch(async e=>{console.error(e);if(page){fs.writeFileSync(path.join(work,'failure.txt'),await page.locator('body').innerText().catch(()=>''));await page.screenshot({path:path.join(work,'failure.png')}).catch(()=>{})}process.exitCode=1}).finally(async()=>{if(context)await context.close().catch(()=>{});if(browser)await browser.close().catch(()=>{});if(server)server.kill()});

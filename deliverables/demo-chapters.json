@@ -1,0 +1,223 @@
+{
+  "recorded": true,
+  "source": "refundops.sqlite3",
+  "duration_seconds": 285,
+  "versions": [
+    {
+      "version": 3,
+      "stage": "shadow"
+    },
+    {
+      "version": 2,
+      "stage": "shadow"
+    },
+    {
+      "version": 1,
+      "stage": "current"
+    }
+  ],
+  "requests": 20,
+  "events": [
+    {
+      "at": 0,
+      "title": "Refund Operations | achopikyan",
+      "copy": "One source dataset, two workspaces. Current v1 reproduces the old policy in a simulated ledger. v2 and v3 are tested before release."
+    },
+    {
+      "at": 7,
+      "title": "Reviewer: all 20 supplied requests",
+      "copy": "All includes completed automatic refunds. Open, Fraud Review, Waiting and Completed are separate filters."
+    },
+    {
+      "at": 14,
+      "title": "A workspace for fast, careful reviews",
+      "copy": "The queue stays on the left. Each request has separate sections, with distinct colors and a persistent action bar."
+    },
+    {
+      "at": 20,
+      "title": "Correct the request where you read it",
+      "copy": "Structured fields can be corrected with an explanation. Saving a changed input invalidates its old analysis and prepares new evidence."
+    },
+    {
+      "at": 27,
+      "title": "Trace every applicable rule",
+      "copy": "The Current version, route and reason appear together. All enabled rules are evaluated; priorities and policy-wide checks resolve the outcome."
+    },
+    {
+      "at": 33,
+      "title": "LLM extraction is already prepared",
+      "copy": "The model reads request-time context and notes, extracts predefined facts, and cites source text. It does not approve refunds or see future outcomes."
+    },
+    {
+      "at": 41,
+      "title": "Risk supports judgment",
+      "copy": "Historical cohorts and monetary scenarios show recorded chargebacks, missing outcomes, review cost and possible exposure. Scenario assumptions remain explicit."
+    },
+    {
+      "at": 48,
+      "title": "Customer context stays separate",
+      "copy": "Earlier requests, prior refunds and inconsistent source data are visible. Activity records changes and decisions without cluttering the main review."
+    },
+    {
+      "at": 54,
+      "title": "An audit trail for every action",
+      "copy": "Approvals, partial refunds, rejection, requests for information, fraud escalation and holds are explained and recorded."
+    },
+    {
+      "at": 60,
+      "title": "Conflicting source rows cannot silently become a payment",
+      "copy": "RF-2183 contains two amounts. A reviewer must verify the canonical version; the system keeps both originals and blocks an unresolved approval."
+    },
+    {
+      "at": 67,
+      "title": "Manager: one library of policy versions",
+      "copy": "v1 remains Current. v2 and v3 start as editable drafts; each has its own Settings, Rules, Discovery, Backtest and Shadow pages."
+    },
+    {
+      "at": 74,
+      "title": "Create a version from an existing policy or from scratch",
+      "copy": "Creation is explicit. Editing an existing draft autosaves that same version; it does not create another policy."
+    },
+    {
+      "at": 80,
+      "title": "Visible checks and editable limits",
+      "copy": "Data safety, business checks, standard evidence questions and payment budgets are explicit. No hidden fallback rule decides a refund."
+    },
+    {
+      "at": 88,
+      "title": "Edit rules in place, with autosave",
+      "copy": "Change a condition directly and see it save. We restore the original $300 threshold before Backtest so comparisons use the supplied versions."
+    },
+    {
+      "at": 97,
+      "title": "Two ways to add a rule",
+      "copy": "Build manually, or describe an intent and review the LLM proposal before adding it. Natural-language drafting needs a live connection; this recording uses saved evidence."
+    },
+    {
+      "at": 107,
+      "title": "Discover new hypotheses from historical cases",
+      "copy": "Candidates not already covered by this version show support, manual-review opportunity, unknown outcomes and financial scenarios. Selection has a clear destination."
+    },
+    {
+      "at": 114,
+      "title": "Inspect evidence before adding a candidate",
+      "copy": "Training support and a later diagnostic split are shown separately. Historical approvals are observations, not ground-truth safety labels."
+    },
+    {
+      "at": 120,
+      "title": "Backtest: inspect the plan before running",
+      "copy": "Every historical request is replayed through this exact version using its saved extraction. Outcomes remain diagnostic context and replay makes no payments."
+    },
+    {
+      "at": 128,
+      "title": "v2: historical results for this version",
+      "copy": "The page reports v2 alone. The manager sees routing, evidence completeness and uncertainty before deciding whether to begin Shadow."
+    },
+    {
+      "at": 134,
+      "title": "Safety & evidence",
+      "copy": "Known adverse outcomes, missing evidence and unobserved outcomes remain distinct. Zero recorded errors does not prove zero risk."
+    },
+    {
+      "at": 139,
+      "title": "Workload & money",
+      "copy": "Proposed refund exposure, historical review minutes and assumption-based costs reveal tradeoffs. Proposed money is not money actually paid."
+    },
+    {
+      "at": 144,
+      "title": "Segments & rules",
+      "copy": "Inspect where results change by cohort and which rules match, win, or are overridden. Aggregate automation can hide a risky segment."
+    },
+    {
+      "at": 149,
+      "title": "Cases",
+      "copy": "Only Cases expands individual requests. Inspect disagreements and supporting evidence before treating a metric as a release argument."
+    },
+    {
+      "at": 155,
+      "title": "Shadow starts only when the manager chooses",
+      "copy": "Backtest does not silently activate Shadow. The version is frozen before observing the shared request pool."
+    },
+    {
+      "at": 162,
+      "title": "v2 is now in Shadow",
+      "copy": "It evaluates the same existing requests as Current, without creating payments or showing its proposals to reviewers. Existing backlog cannot qualify a release."
+    },
+    {
+      "at": 169,
+      "title": "v3: a deliberately broader alternative",
+      "copy": "v3 allows larger apparel returns, including repeat requests. It is a hypothesis to investigate, not an improvement just because it automates more."
+    },
+    {
+      "at": 178,
+      "title": "v3 follows the same historical checks",
+      "copy": "The same data, saved evidence and evaluation engine make version differences inspectable. No special evaluation mode favors a candidate."
+    },
+    {
+      "at": 187,
+      "title": "Both candidates now observe the shared pool",
+      "copy": "v1 is still Current. v2 and v3 are in Shadow, with locked rules and separate results."
+    },
+    {
+      "at": 193,
+      "title": "One independent reviewer decision",
+      "copy": "The reviewer sees Current and source evidence only. This partial-refund decision will become a shared comparison reference for both Shadow versions."
+    },
+    {
+      "at": 201,
+      "title": "A recorded decision and one simulated payment",
+      "copy": "The decision is versioned, explained and written atomically with its ledger entry. Repeating the action cannot create a second refund."
+    },
+    {
+      "at": 207,
+      "title": "Missing evidence has a real work state",
+      "copy": "The request waits for information. It cannot proceed until new evidence is recorded and verified; fraud escalation and holds use the same explicit workflow."
+    },
+    {
+      "at": 220,
+      "title": "Compare all three versions on the same history",
+      "copy": "Current v1, v2 and v3 appear side by side. Each indicator keeps its denominator and definition; the manager owns the acceptable tradeoff."
+    },
+    {
+      "at": 227,
+      "title": "More automation is not the whole decision",
+      "copy": "Compare review workload alongside refund exposure, known adverse outcomes and missing outcome coverage. Cost assumptions are editable in global Settings."
+    },
+    {
+      "at": 235,
+      "title": "Shadow comparison reuses the reviewer work",
+      "copy": "The same request pool and the recorded partial decision feed both candidates. Agreement, changed decisions and potential overpayment remain visible per version."
+    },
+    {
+      "at": 243,
+      "title": "A demonstration is not prospective release evidence",
+      "copy": "The source backlog cannot prove a safe rollout. Activation stays unavailable until the configured new-arrival evidence and financial requirements are met."
+    },
+    {
+      "at": 251,
+      "title": "Current performance belongs to the serving version",
+      "copy": "Open workload, recorded decisions, actual simulated payments, outcomes and execution limits are separated. v1 stayed Current throughout this walkthrough."
+    },
+    {
+      "at": 258,
+      "title": "Current runs automatically within visible limits",
+      "copy": "Each eligible payment checks data, evidence, amount and cumulative spending atomically. A blocked case stays available for human review."
+    },
+    {
+      "at": 264,
+      "title": "Run the supplied file or import another CSV",
+      "copy": "The same application supports pending.csv and a new file with the same columns. Imports preserve source rows, normalize values and surface duplicates."
+    },
+    {
+      "at": 270,
+      "title": "One local app, two operating systems",
+      "copy": "Windows: START.cmd. macOS: sh START.command. The launcher installs dependencies and opens the browser. API keys stay on the backend."
+    },
+    {
+      "at": 277,
+      "title": "Ready for an evidence-based decision | achopikyan",
+      "copy": "v1 Current. v2 and v3 in Shadow. Real saved extraction, explainable rules and explicit uncertainty; no fabricated prospective outcomes or real payments."
+    }
+  ],
+  "errors": []
+}
